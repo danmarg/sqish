@@ -15,33 +15,36 @@ create table history (
   cmd text,
   dir text,
   hostname text,
-  shell_pid integer,
+  shell_session_id text,
   time integer
 );`
+const sqlTable = "history"
+const sqlCols = []string{"cmd", "dir", "hostname", "shell_session_id", "time"}
 
 // Record holds the data recorded for a single shell command.
 type Record struct {
-	Cmd      string
-	Dir      string
-	Hostname string
-	ShellPid int
-	Time     time.Time
+	Cmd            string
+	Dir            string
+	Hostname       string
+	ShellSessionId string
+	Time           time.Time
 }
 
 // Query holds the components of a database query.
 type Query struct {
-	Q        string
-	Dir      *string
-	Hostname *string
-	ShellPid int
-	bool     SortByFreq
-	Limit    int
+	Q              string
+	Dir            *string
+	Hostname       *string
+	ShellSessionId *string
+	SortByFreq     bool
+	Limit          int
 }
 
 // Database holds a database connection and provides insert and retrieval.
 type Database interface {
 	Add(Record) error
 	Close() error
+	Query(q Query) ([]Record, error)
 }
 
 type sqlDatabase struct {
@@ -65,9 +68,9 @@ func NewDatabase(path string) (Database, error) {
 }
 
 func (d *sqlDatabase) Add(r Record) error {
-	_, err := sq.Insert("history").
-		Columns("cmd", "dir", "hostname", "shell_pid", "time").
-		Values(r.Cmd, r.Dir, r.Hostname, r.ShellPid, r.Time.UnixNano()).
+	_, err := sq.Insert(sqlTable).
+		Columns(sqlCols).
+		Values(r.Cmd, r.Dir, r.Hostname, r.ShellSessionId, r.Time.UnixNano()).
 		RunWith(d.db).Exec()
 
 	return err
@@ -75,4 +78,13 @@ func (d *sqlDatabase) Add(r Record) error {
 
 func (d *sqlDatabase) Close() error {
 	return d.db.Close()
+}
+
+func (d *sqlDatabase) Query(q Query) ([]Record, error) {
+	/*	sq.Select().
+		Columns(sqlCols).
+		From(sqlTable).
+		Where(sq.Eq{"cmd"*/
+
+	return nil, nil
 }

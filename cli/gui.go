@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/danmarg/sqish"
 	"github.com/jroimartin/gocui"
@@ -30,7 +31,7 @@ var (
 	onlyMyCwd     = false // True = limit to commands in the current dir; false = no limit.
 )
 
-func runGui(db sqish.Database) error {
+func runGui(db sqish.Database, shellSessionId string) error {
 	g := gocui.NewGui()
 	if err := g.Init(); err != nil {
 		return err
@@ -44,13 +45,27 @@ func runGui(db sqish.Database) error {
 	if err != nil && err != gocui.Quit {
 		return err
 	}
+	// Channels for sending queries and getting responses.
+	queries := make(chan sqish.Query, bufSize)
+	results := make(chan []sqish.Record, bufSize)
 	// Set the editor to do find-as-you-type.
-	//queries := make(chan sqish.Query, bufSize)
-	//results := make(chan sqish.Record, bufSize)
 	gocui.Edit = func(v *gocui.View, k gocui.Key, c rune, m gocui.Modifier) {
-		findAsYouType(db, g)
+		findAsYouType(g, shellSessionId, db, queries)
 		gocui.DefaultEditor(v, k, c, m)
 	}
+	// Async function to execute queries.
+	go func() {
+		for q := range queries {
+			rs, err := db.Query(q)
+			if err != nil {
+				return err
+			}
+			results <- rs
+		}
+	}()
+	// Async function to draw results.
+	// TODO
+
 	return nil
 }
 
@@ -115,12 +130,32 @@ func setKeybindings(g *gocui.Gui) error {
 	return nil
 }
 
-func findAsYouType(db sqish.Database, g *gocui.Gui) error {
+func findAsYouType(g *gocui.Gui, shellSessionId string, db sqish.Database, qs chan<- sqish.Query) error {
 	v, err := g.View(searchBar)
 	if err != nil {
 		return err
 	}
-	_ = v.Buffer()
+	s := v.Buffer()
+	wd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	h, err := os.Hostname()
+	if err != nil {
+		return err
+	}
+	q := sqish.Query{
+		Q:          s,
+		SortByFreq: sortByFreq,
+	}
+	if onlyMySession {
+		q.Hostname = &h
+		q.ShellSessionId = &shellSessionId
+	}
+	if onlyMyCwd {
+		q.Dir = &wd
+	}
+	qs <- q
 
 	return nil
 }

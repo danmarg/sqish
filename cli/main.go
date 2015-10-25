@@ -20,6 +20,11 @@ func main() {
 			Value: os.ExpandEnv("${HOME}/.sqish_db"),
 			Usage: "Path to database",
 		},
+		cli.StringFlag{
+			Name:  "shell_session_id",
+			Value: os.ExpandEnv("$SQISH_SESSION_ID"),
+			Usage: "Shell session ID. This is used to uniquely identify a shell session.",
+		},
 	}
 	app.Commands = []cli.Command{
 		{
@@ -43,11 +48,11 @@ func main() {
 						return err
 					}
 					r := sqish.Record{
-						Cmd:      strings.Join(ctx.Args(), " "),
-						Dir:      wd,
-						Hostname: h,
-						ShellPid: os.Getppid(),
-						Time:     time.Now(),
+						Cmd:            strings.Join(ctx.Args(), " "),
+						Dir:            wd,
+						Hostname:       h,
+						ShellSessionId: ctx.GlobalString("shell_session_id"),
+						Time:           time.Now(),
 					}
 					return db.Add(r)
 				})
@@ -65,7 +70,7 @@ func main() {
 							return err
 						}
 						defer db.Close()
-						return runGui(db)
+						return runGui(db, ctx.GlobalString("shell_session_id"))
 					})
 
 			},
