@@ -8,7 +8,6 @@ import (
 
 	"github.com/codegangsta/cli"
 	"github.com/danmarg/sqish"
-	"github.com/jroimartin/gocui"
 )
 
 func main() {
@@ -59,22 +58,14 @@ func main() {
 			Aliases: []string{"s"},
 			Usage:   "Search backwards",
 			Action: func(ctx *cli.Context) {
-
-			},
-		},
-		{
-			Name:    "interactive",
-			Aliases: []string{"i"},
-			Usage:   "Enter interactive query mode.",
-			Action: func(ctx *cli.Context) {
 				runWithErr(
 					func() error {
-						gui := gocui.NewGui()
-						if err := gui.Init(); err != nil {
+						db, err := sqish.NewDatabase(ctx.GlobalString("database"))
+						if err != nil {
 							return err
 						}
-						defer gui.Close()
-						return nil
+						defer db.Close()
+						return runGui(db)
 					})
 
 			},

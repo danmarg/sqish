@@ -28,10 +28,20 @@ type Record struct {
 	Time     time.Time
 }
 
+// Query holds the components of a database query.
+type Query struct {
+	Q        string
+	Dir      *string
+	Hostname *string
+	ShellPid int
+	bool     SortByFreq
+	Limit    int
+}
+
 // Database holds a database connection and provides insert and retrieval.
 type Database interface {
 	Add(Record) error
-	Close()
+	Close() error
 }
 
 type sqlDatabase struct {
@@ -63,6 +73,6 @@ func (d *sqlDatabase) Add(r Record) error {
 	return err
 }
 
-func (d *sqlDatabase) Close() {
-	d.db.Close()
+func (d *sqlDatabase) Close() error {
+	return d.db.Close()
 }
