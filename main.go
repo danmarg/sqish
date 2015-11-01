@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/codegangsta/cli"
-	"github.com/danmarg/sqish"
 )
 
 func main() {
@@ -33,7 +32,7 @@ func main() {
 			Usage:   "Add a command to the history.",
 			Action: func(ctx *cli.Context) {
 				runWithErr(func() error {
-					db, err := sqish.NewDatabase(ctx.GlobalString("database"))
+					db, err := newDatabase(ctx.GlobalString("database"))
 					if err != nil {
 						return err
 					}
@@ -47,7 +46,7 @@ func main() {
 					if err != nil {
 						return err
 					}
-					r := sqish.Record{
+					r := record{
 						Cmd:            strings.Join(ctx.Args(), " "),
 						Dir:            wd,
 						Hostname:       h,
@@ -65,7 +64,7 @@ func main() {
 			Action: func(ctx *cli.Context) {
 				runWithErr(
 					func() error {
-						db, err := sqish.NewDatabase(ctx.GlobalString("database"))
+						db, err := newDatabase(ctx.GlobalString("database"))
 						if err != nil {
 							return err
 						}

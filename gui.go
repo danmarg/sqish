@@ -5,7 +5,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/danmarg/sqish"
 	"github.com/jroimartin/gocui"
 )
 
@@ -40,20 +39,20 @@ var (
 	}
 	// GUI state.
 	gui            *gocui.Gui
-	db             sqish.Database
+	db             database
 	shellSessionId string
-	queries        chan sqish.Query
-	results        chan []sqish.Record
+	queries        chan query
+	results        chan []record
 	resultsOffset  int
 	// Settings.
 	sortByFreq    = false // True = sort by frequency; false = sort by time.
 	onlyMySession = false // True = limit to results in current shell; false = no limit.
 	onlyMyCwd     = false // True = limit to commands in the current dir; false = no limit.
 	// Currently-displayed results.
-	currentResults []sqish.Record
+	currentResults []record
 )
 
-func runGui(d sqish.Database, shellId string) error {
+func runGui(d database, shellId string) error {
 	gui = gocui.NewGui()
 	db = d
 	shellSessionId = shellId
@@ -66,8 +65,8 @@ func runGui(d sqish.Database, shellId string) error {
 		return err
 	}
 	// Channels for sending queries and getting responses.
-	queries = make(chan sqish.Query, bufSize)
-	results = make(chan []sqish.Record, bufSize)
+	queries = make(chan query, bufSize)
+	results = make(chan []record, bufSize)
 	// Set the editor to do find-as-you-type.
 	gocui.Edit = func(v *gocui.View, k gocui.Key, c rune, m gocui.Modifier) {
 		if _, ok := keybindings[k]; ok {
@@ -164,7 +163,7 @@ func setKeybindings() error {
 	return nil
 }
 
-func findAsYouType(shellSessionId string, db sqish.Database, qs chan<- sqish.Query) error {
+func findAsYouType(shellSessionId string, db database, qs chan<- query) error {
 	v, err := gui.View(searchBar)
 	if err != nil {
 		return err
@@ -178,7 +177,7 @@ func findAsYouType(shellSessionId string, db sqish.Database, qs chan<- sqish.Que
 	if err != nil {
 		return err
 	}
-	q := sqish.Query{
+	q := query{
 		Cmd:        &s,
 		SortByFreq: sortByFreq,
 	}
@@ -241,7 +240,7 @@ func drawSettings(v *gocui.View) error {
 	return nil
 }
 
-func drawResults(rs []sqish.Record) error {
+func drawResults(rs []record) error {
 	v, err := gui.View(resultsWindow)
 	if err != nil {
 		return err

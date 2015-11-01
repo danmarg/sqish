@@ -1,5 +1,4 @@
-// Package sqish implements the basic functionality to store and retrieve shell histories.
-package sqish
+package main
 
 import (
 	"os"
@@ -16,8 +15,12 @@ const (
 	sqlSelectByDate = "cmd, dir, hostname, shell_session_id, time"
 )
 
-// Record holds the data recorded for a single shell command.
-type Record struct {
+// Setting holds the persisted settings.
+type Setting struct {
+}
+
+// record holds the data recorded for a single shell command.
+type record struct {
 	Cmd            string `sql:"size:65535"`
 	Dir            string `sql:"size:65535"`
 	Hostname       string `sql:"size:65535"`
@@ -25,8 +28,8 @@ type Record struct {
 	Time           time.Time
 }
 
-// Query holds the components of a database query.
-type Query struct {
+// query holds the components of a database query.
+type query struct {
 	Cmd            *string
 	Dir            *string
 	Hostname       *string
@@ -35,41 +38,41 @@ type Query struct {
 	Limit          int
 }
 
-// Database holds a database connection and provides insert and retrieval.
-type Database interface {
-	Add(*Record) error
+// database holds a database connection and provides insert and retrieval.
+type database interface {
+	Add(*record) error
 	Close() error
-	Query(q Query) ([]Record, error)
+	Query(q query) ([]record, error)
 }
 
-type sqlDatabase struct {
+type sqldatabase struct {
 	db gorm.DB
-	Database
+	database
 }
 
-func NewDatabase(path string) (Database, error) {
-	d := &sqlDatabase{}
+func newDatabase(path string) (database, error) {
+	d := &sqldatabase{}
 	// Check if the DB already exists, or if we must create the table.
 	_, err := os.Stat(path)
 	n := os.IsNotExist(err)
 	d.db, err = gorm.Open("sqlite3", path)
 	// If new, we must create the table.
 	if n {
-		err = d.db.CreateTable(&Record{}).Error
+		err = d.db.CreateTable(&record{}).Error
 	}
 	return d, err
 }
 
-func (d *sqlDatabase) Add(r *Record) error {
+func (d *sqldatabase) Add(r *record) error {
 	return d.db.Create(r).Error
 }
 
-func (d *sqlDatabase) Close() error {
+func (d *sqldatabase) Close() error {
 	return d.db.Close()
 }
 
-func (d *sqlDatabase) Query(q Query) ([]Record, error) {
-	var rs []Record
+func (d *sqldatabase) query(q query) ([]record, error) {
+	var rs []record
 	var ws []string
 	var ps []interface{}
 	if q.Cmd != nil {
