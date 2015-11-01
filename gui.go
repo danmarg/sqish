@@ -18,12 +18,33 @@ const (
 )
 
 var (
+	// GUI state.
+	gui            *gocui.Gui
+	db             database
+	shellSessionId string
+	queries        chan query
+	results        chan []record
+	resultsOffset  int
+	// Settings.
+	set setting
+	// Currently-displayed results.
+	currentResults []record
+	// Key binding map.
 	keybindings = map[gocui.Key]gocui.KeybindingHandler{
-		gocui.KeyCtrlC:     func(_ *gocui.Gui, _ *gocui.View) error { return gocui.Quit },
-		gocui.KeyCtrlD:     func(_ *gocui.Gui, _ *gocui.View) error { return gocui.Quit },
-		gocui.KeyCtrlS:     func(g *gocui.Gui, v *gocui.View) error { sortByFreq = !sortByFreq; return drawSettings(v) },
-		gocui.KeyCtrlL:     func(g *gocui.Gui, v *gocui.View) error { onlyMySession = !onlyMySession; return drawSettings(v) },
-		gocui.KeyCtrlW:     func(g *gocui.Gui, v *gocui.View) error { onlyMyCwd = !onlyMyCwd; return drawSettings(v) },
+		gocui.KeyCtrlC: quit,
+		gocui.KeyCtrlD: quit,
+		gocui.KeyCtrlS: func(g *gocui.Gui, v *gocui.View) error {
+			set.SortByFreq = !set.SortByFreq
+			return drawSettings(v)
+		},
+		gocui.KeyCtrlL: func(g *gocui.Gui, v *gocui.View) error {
+			set.OnlyMySession = !set.OnlyMySession
+			return drawSettings(v)
+		},
+		gocui.KeyCtrlW: func(g *gocui.Gui, v *gocui.View) error {
+			set.OnlyMyCwd = !set.OnlyMyCwd
+			return drawSettings(v)
+		},
 		gocui.KeyArrowUp:   func(g *gocui.Gui, v *gocui.View) error { return moveResultLine(true) },
 		gocui.KeyArrowDown: func(g *gocui.Gui, v *gocui.View) error { return moveResultLine(false) },
 		gocui.KeyEnter: func(g *gocui.Gui, v *gocui.View) error {
@@ -34,27 +55,19 @@ var (
 			if resultsOffset < len(currentResults) {
 				os.Stderr.WriteString(currentResults[resultsOffset].Cmd)
 			}
-			return gocui.Quit
+			return quit(g, v)
 		},
 	}
-	// GUI state.
-	gui            *gocui.Gui
-	db             database
-	shellSessionId string
-	queries        chan query
-	results        chan []record
-	resultsOffset  int
-	// Settings.
-	sortByFreq    = false // True = sort by frequency; false = sort by time.
-	onlyMySession = false // True = limit to results in current shell; false = no limit.
-	onlyMyCwd     = false // True = limit to commands in the current dir; false = no limit.
-	// Currently-displayed results.
-	currentResults []record
 )
 
 func runGui(d database, shellId string) error {
+	var err error
 	gui = gocui.NewGui()
 	db = d
+	set, err = db.Setting()
+	if err != nil {
+		return err
+	}
 	shellSessionId = shellId
 	if err := gui.Init(); err != nil {
 		return err
@@ -94,11 +107,18 @@ func runGui(d database, shellId string) error {
 		}
 	}()
 	// Start GUI loop.
-	err := gui.MainLoop()
+	err = gui.MainLoop()
 	if err != nil && err != gocui.Quit {
 		return err
 	}
 	return nil
+}
+
+func quit(_ *gocui.Gui, _ *gocui.View) error {
+	if err := db.WriteSetting(&set); err != nil {
+		return err
+	}
+	return gocui.Quit
 }
 
 func layout(g *gocui.Gui) error {
@@ -179,13 +199,13 @@ func findAsYouType(shellSessionId string, db database, qs chan<- query) error {
 	}
 	q := query{
 		Cmd:        &s,
-		SortByFreq: sortByFreq,
+		SortByFreq: set.SortByFreq,
 	}
-	if onlyMySession {
+	if set.OnlyMySession {
 		q.Hostname = &h
 		q.ShellSessionId = &shellSessionId
 	}
-	if onlyMyCwd {
+	if set.OnlyMyCwd {
 		q.Dir = &wd
 	}
 	qs <- q
@@ -215,19 +235,19 @@ func drawSettings(v *gocui.View) error {
 	v.Clear()
 	maxX, _ := gui.Size()
 	var a, b, c, d rune
-	if sortByFreq {
+	if set.SortByFreq {
 		a, b = ' ', '*'
 	} else {
 		a, b = '*', ' '
 	}
 	left := fmt.Sprintf("[^S]ort by [%c] time [%c] freq", a, b)
-	if onlyMySession {
+	if set.OnlyMySession {
 		c = '*'
 	} else {
 		c = ' '
 	}
 	middle := fmt.Sprintf("[^L]imit to my session [%c]", c)
-	if onlyMyCwd {
+	if set.OnlyMyCwd {
 		d = '*'
 	} else {
 		d = ' '

@@ -15,8 +15,12 @@ const (
 	sqlSelectByDate = "cmd, dir, hostname, shell_session_id, time"
 )
 
-// Setting holds the persisted settings.
-type Setting struct {
+// setting holds the persisted settings.
+type setting struct {
+	ID            int
+	SortByFreq    bool
+	OnlyMySession bool
+	OnlyMyCwd     bool
 }
 
 // record holds the data recorded for a single shell command.
@@ -42,36 +46,43 @@ type query struct {
 type database interface {
 	Add(*record) error
 	Close() error
-	Query(q query) ([]record, error)
+	Query(query) ([]record, error)
+	Setting() (setting, error)
+	WriteSetting(*setting) error
 }
 
-type sqldatabase struct {
+type sqlDatabase struct {
 	db gorm.DB
 	database
 }
 
 func newDatabase(path string) (database, error) {
-	d := &sqldatabase{}
+	d := &sqlDatabase{}
 	// Check if the DB already exists, or if we must create the table.
 	_, err := os.Stat(path)
 	n := os.IsNotExist(err)
 	d.db, err = gorm.Open("sqlite3", path)
 	// If new, we must create the table.
 	if n {
-		err = d.db.CreateTable(&record{}).Error
+		if err := d.db.CreateTable(&setting{}).Error; err != nil {
+			return nil, err
+		}
+		if err := d.db.CreateTable(&record{}).Error; err != nil {
+			return nil, err
+		}
 	}
 	return d, err
 }
 
-func (d *sqldatabase) Add(r *record) error {
+func (d *sqlDatabase) Add(r *record) error {
 	return d.db.Create(r).Error
 }
 
-func (d *sqldatabase) Close() error {
+func (d *sqlDatabase) Close() error {
 	return d.db.Close()
 }
 
-func (d *sqldatabase) query(q query) ([]record, error) {
+func (d *sqlDatabase) Query(q query) ([]record, error) {
 	var rs []record
 	var ws []string
 	var ps []interface{}
@@ -93,10 +104,23 @@ func (d *sqldatabase) query(q query) ([]record, error) {
 	}
 	var db *gorm.DB
 	if q.SortByFreq {
-		db = d.db.Table("records").Select(sqlSelectByFreq).Where(strings.Join(ws, " "), ps...).Group(sqlGroupByFreq)
+		db = d.db.Table("records").Select(sqlSelectByFreq).Where(strings.Join(ws, " and "), ps...).Group(sqlGroupByFreq)
 	} else {
-		db = d.db.Table("records").Select(sqlSelectByDate).Where(strings.Join(ws, " "), ps...)
+		db = d.db.Table("records").Select(sqlSelectByDate).Where(strings.Join(ws, " and "), ps...)
 	}
 	err := db.Scan(&rs).Error
 	return rs, err
+}
+
+func (d *sqlDatabase) Setting() (setting, error) {
+	var s setting
+	r := d.db.First(&s)
+	if r.RecordNotFound() {
+		return s, nil
+	}
+	return s, r.Error
+}
+
+func (d *sqlDatabase) WriteSetting(s *setting) error {
+	return d.db.Save(s).Error
 }
