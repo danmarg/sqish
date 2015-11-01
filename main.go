@@ -47,11 +47,14 @@ func main() {
 						return err
 					}
 					r := record{
-						Cmd:            strings.Join(ctx.Args(), " "),
+						Cmd:            strings.TrimSpace(strings.Join(ctx.Args(), " ")),
 						Dir:            wd,
 						Hostname:       h,
 						ShellSessionId: ctx.GlobalString("shell_session_id"),
 						Time:           time.Now(),
+					}
+					if len(r.Cmd) == 0 {
+						return nil
 					}
 					return db.Add(&r)
 				})
