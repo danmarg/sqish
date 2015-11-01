@@ -21,7 +21,7 @@ var (
 	// GUI state.
 	gui            *gocui.Gui
 	db             database
-	shellSessionId string
+	shellSessionID string
 	queries        chan query
 	results        chan []record
 	resultsOffset  int
@@ -60,7 +60,7 @@ var (
 	}
 )
 
-func runGui(d database, shellId string) error {
+func runGui(d database, shellID string) error {
 	var err error
 	gui = gocui.NewGui()
 	db = d
@@ -68,7 +68,7 @@ func runGui(d database, shellId string) error {
 	if err != nil {
 		return err
 	}
-	shellSessionId = shellId
+	shellSessionID = shellID
 	if err := gui.Init(); err != nil {
 		return err
 	}
@@ -86,7 +86,7 @@ func runGui(d database, shellId string) error {
 			return
 		}
 		gocui.DefaultEditor(v, k, c, m)
-		findAsYouType(shellSessionId, db, queries)
+		findAsYouType(shellSessionID, db, queries)
 	}
 	// Async function to execute queries.
 	go func() {
@@ -183,7 +183,7 @@ func setKeybindings() error {
 	return nil
 }
 
-func findAsYouType(shellSessionId string, db database, qs chan<- query) error {
+func findAsYouType(shellSessionID string, db database, qs chan<- query) error {
 	v, err := gui.View(searchBar)
 	if err != nil {
 		return err
@@ -203,7 +203,7 @@ func findAsYouType(shellSessionId string, db database, qs chan<- query) error {
 	}
 	if set.OnlyMySession {
 		q.Hostname = &h
-		q.ShellSessionId = &shellSessionId
+		q.ShellSessionID = &shellSessionID
 	}
 	if set.OnlyMyCwd {
 		q.Dir = &wd
@@ -219,10 +219,10 @@ func moveResultLine(up bool) error {
 	}
 	if up && resultsOffset > 0 {
 		v.MoveCursor(0, -1, false)
-		resultsOffset -= 1
+		resultsOffset--
 	} else if resultsOffset < len(currentResults) {
 		v.MoveCursor(0, 1, false)
-		resultsOffset += 1
+		resultsOffset++
 	}
 	return nil
 }
@@ -256,7 +256,7 @@ func drawSettings(v *gocui.View) error {
 	lpad := make([]byte, maxX/2-len(left)-len(middle)/2)
 	rpad := make([]byte, maxX/2-len(right)-len(middle)/2)
 	fmt.Fprint(v, left+string(lpad)+middle+string(rpad)+right)
-	findAsYouType(shellSessionId, db, queries)
+	findAsYouType(shellSessionID, db, queries)
 	return nil
 }
 
