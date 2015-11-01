@@ -3,18 +3,25 @@ package sqish
 
 import (
 	"os"
+	"strings"
 	"time"
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
 )
 
+const (
+	sqlSelectByFreq = "cmd, dir, '' as hostname, '' as shell_session_id, time" // TODO: do max(time) here.
+	sqlGroupByFreq  = "cmd, dir"
+	sqlSelectByDate = "cmd, dir, hostname, shell_session_id, time"
+)
+
 // Record holds the data recorded for a single shell command.
 type Record struct {
-	Cmd            string
-	Dir            string
-	Hostname       string
-	ShellSessionId string
+	Cmd            string `sql:"size:65535"`
+	Dir            string `sql:"size:65535"`
+	Hostname       string `sql:"size:65535"`
+	ShellSessionId string `sql:"size:65535"`
 	Time           time.Time
 }
 
@@ -61,18 +68,32 @@ func (d *sqlDatabase) Close() error {
 	return d.db.Close()
 }
 
-func orEmpty(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
-}
-
 func (d *sqlDatabase) Query(q Query) ([]Record, error) {
 	var rs []Record
-	// TODO: filter on other variables.
-	err := d.db.Where("cmd LIKE ?", "%"+orEmpty(q.Cmd)+"%").
-		// TODO: Allow sort by frequency.
-		Order("time").Find(&rs).Error
+	var ws []string
+	var ps []interface{}
+	if q.Cmd != nil {
+		ws = append(ws, "cmd LIKE ?")
+		ps = append(ps, "%"+*q.Cmd+"%")
+	}
+	if q.Dir != nil {
+		ws = append(ws, "dir = ?")
+		ps = append(ps, q.Dir)
+	}
+	if q.Hostname != nil {
+		ws = append(ws, "hostname = ?")
+		ps = append(ps, q.Hostname)
+	}
+	if q.ShellSessionId != nil {
+		ws = append(ws, "shell_session_id = ?")
+		ps = append(ps, q.ShellSessionId)
+	}
+	var db *gorm.DB
+	if q.SortByFreq {
+		db = d.db.Table("records").Select(sqlSelectByFreq).Where(strings.Join(ws, " "), ps...).Group(sqlGroupByFreq)
+	} else {
+		db = d.db.Table("records").Select(sqlSelectByDate).Where(strings.Join(ws, " "), ps...)
+	}
+	err := db.Scan(&rs).Error
 	return rs, err
 }

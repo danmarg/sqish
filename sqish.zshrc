@@ -1,5 +1,5 @@
 SQISH_ID="$(hostname)_$(date +%s)_$(shuf -i 1-100 -n 1)"
-SQISH=$(env sqish)
+SQISH=sqish
 # Add to history.
 function sqish_add () { $SQISH --shell_session_id $SQISH_ID add "$1" }
 autoload add-zsh-hook
@@ -9,6 +9,6 @@ function sqish_search() {
   t=$(mktemp)
   $SQISH --shell_session_id $SQISH_ID search 2> $t
   cmd=$(cat $t)
-  $cmd
+  eval "$cmd"
 }
-bindkey '^S' sqish_search
+

@@ -32,15 +32,19 @@ var (
 			if err != nil {
 				return err
 			}
-			x, _ := v.Cursor()
-			if x < len(currentResults) {
-				os.Stderr.WriteString(currentResults[x].Cmd)
+			if resultsOffset < len(currentResults) {
+				os.Stderr.WriteString(currentResults[resultsOffset].Cmd)
 			}
 			return gocui.Quit
 		},
 	}
 	// GUI state.
-	gui *gocui.Gui
+	gui            *gocui.Gui
+	db             sqish.Database
+	shellSessionId string
+	queries        chan sqish.Query
+	results        chan []sqish.Record
+	resultsOffset  int
 	// Settings.
 	sortByFreq    = false // True = sort by frequency; false = sort by time.
 	onlyMySession = false // True = limit to results in current shell; false = no limit.
@@ -49,8 +53,10 @@ var (
 	currentResults []sqish.Record
 )
 
-func runGui(db sqish.Database, shellSessionId string) error {
+func runGui(d sqish.Database, shellId string) error {
 	gui = gocui.NewGui()
+	db = d
+	shellSessionId = shellId
 	if err := gui.Init(); err != nil {
 		return err
 	}
@@ -60,8 +66,8 @@ func runGui(db sqish.Database, shellSessionId string) error {
 		return err
 	}
 	// Channels for sending queries and getting responses.
-	queries := make(chan sqish.Query, bufSize)
-	results := make(chan []sqish.Record, bufSize)
+	queries = make(chan sqish.Query, bufSize)
+	results = make(chan []sqish.Record, bufSize)
 	// Set the editor to do find-as-you-type.
 	gocui.Edit = func(v *gocui.View, k gocui.Key, c rune, m gocui.Modifier) {
 		if _, ok := keybindings[k]; ok {
@@ -184,7 +190,6 @@ func findAsYouType(shellSessionId string, db sqish.Database, qs chan<- sqish.Que
 		q.Dir = &wd
 	}
 	qs <- q
-
 	return nil
 }
 
@@ -193,13 +198,12 @@ func moveResultLine(up bool) error {
 	if err != nil {
 		return err
 	}
-	if up {
+	if up && resultsOffset > 0 {
 		v.MoveCursor(0, -1, false)
-	} else {
-		if _, y := v.Cursor(); y+1 >= len(currentResults) {
-			return nil
-		}
+		resultsOffset -= 1
+	} else if resultsOffset < len(currentResults) {
 		v.MoveCursor(0, 1, false)
+		resultsOffset += 1
 	}
 	return nil
 }
@@ -233,21 +237,22 @@ func drawSettings(v *gocui.View) error {
 	lpad := make([]byte, maxX/2-len(left)-len(middle)/2)
 	rpad := make([]byte, maxX/2-len(right)-len(middle)/2)
 	fmt.Fprint(v, left+string(lpad)+middle+string(rpad)+right)
+	findAsYouType(shellSessionId, db, queries)
 	return nil
 }
 
 func drawResults(rs []sqish.Record) error {
-	_, maxY := gui.Size()
 	v, err := gui.View(resultsWindow)
 	if err != nil {
 		return err
 	}
 	v.Clear()
-	currentResults = rs
-	for i := 0; i < len(rs) && i < maxY-4; i++ {
-		fmt.Fprintf(v, "%s\t\t|\t\t%s\n", rs[i].Time.Format("2006/01/02 15:04:05"), rs[i].Cmd)
-	}
 	v.SetCursor(0, 0)
+	resultsOffset = 0
+	currentResults = rs
+	for _, r := range rs {
+		fmt.Fprintf(v, "%s\t\t|\t\t%s\n", r.Time.Format("2006/01/02 15:04:05"), strings.Replace(r.Cmd, "\n", " ", -1))
+	}
 	gui.Flush()
 	return nil
 }
