@@ -5,8 +5,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
-	gn "github.com/naoina/genmai"
 )
 
 // Record holds the data recorded for a single shell command.
@@ -36,7 +36,7 @@ type Database interface {
 }
 
 type sqlDatabase struct {
-	db *gn.DB
+	db gorm.DB
 	Database
 }
 
@@ -45,17 +45,16 @@ func NewDatabase(path string) (Database, error) {
 	// Check if the DB already exists, or if we must create the table.
 	_, err := os.Stat(path)
 	n := os.IsNotExist(err)
-	d.db, err = gn.New(&gn.SQLite3Dialect{}, path)
+	d.db, err = gorm.Open("sqlite3", path)
 	// If new, we must create the table.
 	if n {
-		err = d.db.CreateTable(&Record{})
+		err = d.db.CreateTable(&Record{}).Error
 	}
 	return d, err
 }
 
 func (d *sqlDatabase) Add(r *Record) error {
-	_, err := d.db.Insert(r)
-	return err
+	return d.db.Create(r).Error
 }
 
 func (d *sqlDatabase) Close() error {
@@ -72,9 +71,8 @@ func orEmpty(s *string) string {
 func (d *sqlDatabase) Query(q Query) ([]Record, error) {
 	var rs []Record
 	// TODO: filter on other variables.
-	err := d.db.Select(&rs, d.db.Where("cmd").
-		Like("%"+orEmpty(q.Cmd)+"%").
+	err := d.db.Where("cmd LIKE ?", "%"+orEmpty(q.Cmd)+"%").
 		// TODO: Allow sort by frequency.
-		OrderBy("time", gn.DESC))
+		Order("time").Find(&rs).Error
 	return rs, err
 }
