@@ -11,4 +11,5 @@ function sqish_search() {
   cmd=$(cat $t)
   eval "$cmd"
 }
+bindkey -s '^z' '^Usqish_search^M'
 
