@@ -28,7 +28,7 @@ type record struct {
 	Cmd            string `sql:"size:65535"`
 	Dir            string `sql:"size:65535"`
 	Hostname       string `sql:"size:65535"`
-	ShellSessionId string `sql:"size:65535"`
+	ShellSessionID string `sql:"size:65535"`
 	Time           time.Time
 }
 
@@ -37,7 +37,7 @@ type query struct {
 	Cmd            *string
 	Dir            *string
 	Hostname       *string
-	ShellSessionId *string
+	ShellSessionID *string
 	SortByFreq     bool
 	Limit          int
 }
@@ -98,9 +98,9 @@ func (d *sqlDatabase) Query(q query) ([]record, error) {
 		ws = append(ws, "hostname = ?")
 		ps = append(ps, q.Hostname)
 	}
-	if q.ShellSessionId != nil {
+	if q.ShellSessionID != nil {
 		ws = append(ws, "shell_session_id = ?")
-		ps = append(ps, q.ShellSessionId)
+		ps = append(ps, q.ShellSessionID)
 	}
 	var db *gorm.DB
 	if q.SortByFreq {
