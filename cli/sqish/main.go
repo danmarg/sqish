@@ -54,7 +54,7 @@ func main() {
 						ShellSessionId: ctx.GlobalString("shell_session_id"),
 						Time:           time.Now(),
 					}
-					return db.Add(r)
+					return db.Add(&r)
 				})
 			},
 		},
