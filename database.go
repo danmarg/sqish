@@ -11,7 +11,7 @@ import (
 
 const (
 	sqlSelectByFreq = "cmd, dir, '' as hostname, '' as shell_session_id, time" // TODO: do max(time) here.
-	sqlGroupByFreq  = "cmd, dir"
+	sqlGroupByFreq  = "cmd"
 	sqlSelectByDate = "cmd, dir, hostname, shell_session_id, time"
 )
 
