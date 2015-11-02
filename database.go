@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	sqlSelectByFreq = "cmd, dir, '' as hostname, '' as shell_session_id, time" // TODO: do max(time) here.
+	sqlSelectByFreq = "cmd, dir, '' as hostname, '' as shell_session_id, time, count(*) c" // TODO: do max(time) here.
 	sqlGroupByFreq  = "cmd"
 	sqlSelectByDate = "cmd, dir, hostname, shell_session_id, time"
 )
@@ -104,9 +104,9 @@ func (d *sqlDatabase) Query(q query) ([]record, error) {
 	}
 	var db *gorm.DB
 	if q.SortByFreq {
-		db = d.db.Table("records").Select(sqlSelectByFreq).Where(strings.Join(ws, " and "), ps...).Group(sqlGroupByFreq)
+		db = d.db.Table("records").Select(sqlSelectByFreq).Where(strings.Join(ws, " and "), ps...).Group(sqlGroupByFreq).Order("c desc")
 	} else {
-		db = d.db.Table("records").Select(sqlSelectByDate).Where(strings.Join(ws, " and "), ps...)
+		db = d.db.Table("records").Select(sqlSelectByDate).Where(strings.Join(ws, " and "), ps...).Order("time desc")
 	}
 	err := db.Scan(&rs).Error
 	return rs, err
