@@ -64,6 +64,12 @@ func main() {
 			Name:    "search",
 			Aliases: []string{"s"},
 			Usage:   "Search backwards",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "query",
+					Usage: "Query to pre-fill search bar with.",
+				},
+			},
 			Action: func(ctx *cli.Context) {
 				runWithErr(
 					func() error {
@@ -72,7 +78,7 @@ func main() {
 							return err
 						}
 						defer db.Close()
-						return runGui(db, ctx.GlobalString("shell_session_id"))
+						return runGui(db, ctx.GlobalString("shell_session_id"), ctx.String("query"))
 					})
 
 			},

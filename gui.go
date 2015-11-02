@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/jroimartin/gocui"
 )
@@ -25,6 +26,7 @@ var (
 	queries        chan query
 	results        chan []record
 	resultsOffset  int
+	once           sync.Once
 	// Settings.
 	set setting
 	// Currently-displayed results.
@@ -60,7 +62,7 @@ var (
 	}
 )
 
-func runGui(d database, shellID string) error {
+func runGui(d database, shellID, initialQuery string) error {
 	var err error
 	gui = gocui.NewGui()
 	db = d
@@ -73,7 +75,25 @@ func runGui(d database, shellID string) error {
 		return err
 	}
 	defer gui.Close()
-	gui.SetLayout(layout)
+	gui.SetLayout(func(g *gocui.Gui) error {
+		if err := layout(g); err != nil {
+			return err
+		}
+		// Prefill the search bar. This is ugly, I admit.
+		once.Do(func() {
+			v, err := g.View(searchBar)
+			if err != nil {
+				panic(err)
+			}
+			for _, c := range initialQuery {
+				v.EditWrite(c)
+			}
+			if err := findAsYouType(shellSessionID, db, queries); err != nil {
+				panic(err)
+			}
+		})
+		return nil
+	})
 	if err := setKeybindings(); err != nil {
 		return err
 	}

@@ -7,7 +7,11 @@ add-zsh-hook zshaddhistory sqish-add
 # Search history.
 function sqish-search () {
         t=$(mktemp)
-        $SQISH --shell_session_id $SQISH_ID search 2> $t
+        if [[ $BUFFER != "" ]]; then
+          $SQISH --shell_session_id $SQISH_ID search --query $BUFFER 2> $t
+        else
+          $SQISH --shell_session_id $SQISH_ID search 2> $t
+        fi
         cmd=$(cat $t)
         LBUFFER+="$cmd"
 }
