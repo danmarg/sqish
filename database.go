@@ -52,7 +52,7 @@ type database interface {
 }
 
 type sqlDatabase struct {
-	db gorm.DB
+	db *gorm.DB
 	database
 }
 

@@ -101,13 +101,13 @@ func runGui(d database, shellID, initialQuery string) error {
 	queries = make(chan query, bufSize)
 	results = make(chan []record, bufSize)
 	// Set the editor to do find-as-you-type.
-	gocui.Edit = func(v *gocui.View, k gocui.Key, c rune, m gocui.Modifier) {
+	gui.Editor = gocui.EditorFunc(func(v *gocui.View, k gocui.Key, c rune, m gocui.Modifier) {
 		if _, ok := keybindings[k]; ok {
 			return
 		}
-		gocui.DefaultEditor(v, k, c, m)
+		gocui.DefaultEditor.Edit(v, k, c, m)
 		findAsYouType(shellSessionID, db, queries)
-	}
+	})
 	// Async function to execute queries.
 	go func() {
 		for q := range queries {
@@ -128,7 +128,7 @@ func runGui(d database, shellID, initialQuery string) error {
 	}()
 	// Start GUI loop.
 	err = gui.MainLoop()
-	if err != nil && err != gocui.Quit {
+	if err != nil && err != gocui.ErrQuit {
 		return err
 	}
 	return nil
@@ -138,7 +138,7 @@ func quit(_ *gocui.Gui, _ *gocui.View) error {
 	if err := db.WriteSetting(&set); err != nil {
 		return err
 	}
-	return gocui.Quit
+	return gocui.ErrQuit
 }
 
 func layout(g *gocui.Gui) error {
@@ -163,7 +163,7 @@ func layout(g *gocui.Gui) error {
 	// searchTitle
 	searchTxt := "Search:"
 	if v, err := g.SetView(searchTitle, -1, maxY-4, len(searchTxt), maxY-2); err != nil {
-		if err != gocui.ErrorUnkView {
+		if err != gocui.ErrUnknownView {
 			return err
 		}
 		v.Frame = false
@@ -172,7 +172,7 @@ func layout(g *gocui.Gui) error {
 	}
 	// searchBar
 	if v, err := g.SetView(searchBar, len(searchTxt), maxY-4, maxX, maxY-2); err != nil {
-		if err != gocui.ErrorUnkView {
+		if err != gocui.ErrUnknownView {
 			return err
 		}
 		v.Editable = true
@@ -180,7 +180,7 @@ func layout(g *gocui.Gui) error {
 	}
 	// toolBar
 	if v, err := g.SetView(toolBar, -1, maxY-2, maxX, maxY); err != nil {
-		if err != gocui.ErrorUnkView {
+		if err != gocui.ErrUnknownView {
 			return err
 		}
 		v.Frame = false
@@ -240,7 +240,7 @@ func moveResultLine(up bool) error {
 	if up && resultsOffset > 0 {
 		v.MoveCursor(0, -1, false)
 		resultsOffset--
-	} else if resultsOffset < len(currentResults) {
+	} else if !up && resultsOffset < len(currentResults)-1 {
 		v.MoveCursor(0, 1, false)
 		resultsOffset++
 	}
@@ -292,6 +292,5 @@ func drawResults(rs []record) error {
 	for _, r := range rs {
 		fmt.Fprintf(v, "%s\t\t|\t\t%s\n", r.Time.Format("2006/01/02 15:04:05"), strings.Replace(r.Cmd, "\n", " ", -1))
 	}
-	gui.Flush()
 	return nil
 }
