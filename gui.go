@@ -157,7 +157,6 @@ func layout(g *gocui.Gui) error {
 	// resultsWindow
 	if v, err := g.SetView(resultsWindow, -1, -1, maxX, maxY-4); err != nil {
 		v.Frame = true
-		v.Wrap = true
 		v.Highlight = true
 		v.SelBgColor, v.SelFgColor = v.FgColor, v.BgColor
 	}
