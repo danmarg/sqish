@@ -88,7 +88,7 @@ func runGui(d database, shellID, initialQuery string) error {
 			for _, c := range initialQuery {
 				v.EditWrite(c)
 			}
-			if err := findAsYouType(shellSessionID, db, queries); err != nil {
+			if err := guiFindAsYouType(shellSessionID, db, queries); err != nil {
 				panic(err)
 			}
 		})
@@ -106,7 +106,7 @@ func runGui(d database, shellID, initialQuery string) error {
 			return
 		}
 		gocui.DefaultEditor.Edit(v, k, c, m)
-		findAsYouType(shellSessionID, db, queries)
+		guiFindAsYouType(shellSessionID, db, queries)
 	})
 	// Async function to execute queries.
 	go func() {
@@ -200,7 +200,7 @@ func setKeybindings() error {
 	return nil
 }
 
-func findAsYouType(shellSessionID string, db database, qs chan<- query) error {
+func guiFindAsYouType(shellSessionID string, db database, qs chan<- query) error {
 	v, err := gui.View(searchBar)
 	if err != nil {
 		return err
@@ -297,7 +297,7 @@ func drawSettings(v *gocui.View) error {
 		rpad = make([]byte, maxX/2-len(right)-len(middle)/2)
 	}
 	fmt.Fprint(v, left+string(lpad)+middle+string(rpad)+right)
-	findAsYouType(shellSessionID, db, queries)
+	guiFindAsYouType(shellSessionID, db, queries)
 	return nil
 }
 
