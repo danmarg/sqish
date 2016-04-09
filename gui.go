@@ -157,6 +157,7 @@ func layout(g *gocui.Gui) error {
 	// resultsWindow
 	if v, err := g.SetView(resultsWindow, -1, -1, maxX, maxY-4); err != nil {
 		v.Frame = true
+		v.Wrap = true
 		v.Highlight = true
 		v.SelBgColor, v.SelFgColor = v.FgColor, v.BgColor
 	}
@@ -176,6 +177,7 @@ func layout(g *gocui.Gui) error {
 			return err
 		}
 		v.Editable = true
+		v.Wrap = true
 		v.Frame = false
 	}
 	// toolBar
@@ -250,27 +252,51 @@ func drawSettings(v *gocui.View) error {
 	}
 	v.Clear()
 	maxX, _ := gui.Size()
-	var a, b, c, d rune
+	var a, b, s, c, d rune
 	if set.SortByFreq {
-		a, b = ' ', '*'
+		a, b, s = ' ', '*', 'f'
 	} else {
-		a, b = '*', ' '
+		a, b, s = '*', ' ', 't'
 	}
-	left := fmt.Sprintf("[^S]ort by [%c] time [%c] freq", a, b)
+	// leftL is the "long" option; leftS is the "short" one.
+	leftL := fmt.Sprintf("[^S]ort by [%c] time [%c] freq", a, b)
+	leftS := fmt.Sprintf("[^S][%c]", s)
+	// Middle (long and short).
 	if set.OnlyMySession {
 		c = '*'
 	} else {
 		c = ' '
 	}
-	middle := fmt.Sprintf("[^L]imit to my session [%c]", c)
+	middleL := fmt.Sprintf("[^L]imit to my session [%c]", c)
+	middleS := fmt.Sprintf("[^L][%c]", c)
+
+	// Right (long and short).
 	if set.OnlyMyCwd {
 		d = '*'
 	} else {
 		d = ' '
 	}
-	right := fmt.Sprintf("[^W]orking dir only [%c]", d)
-	lpad := make([]byte, maxX/2-len(left)-len(middle)/2)
-	rpad := make([]byte, maxX/2-len(right)-len(middle)/2)
+	rightL := fmt.Sprintf("[^W]orking dir only [%c]", d)
+	rightS := fmt.Sprintf("[^W][%c]", d)
+
+	// Now choose the long or short form and pad it.
+	var left, middle, right string
+	if len(leftL)+len(middleL)+len(rightL) < maxX {
+		left, middle, right = leftL, middleL, rightL
+	} else {
+		left, middle, right = leftS, middleS, rightS
+	}
+	var lpad, rpad []byte
+	if len(left)+len(middle)/2 >= maxX/2 {
+		lpad = []byte{}
+	} else {
+		lpad = make([]byte, maxX/2-len(left)-len(middle)/2)
+	}
+	if len(right)+len(middle)/2 >= maxX/2 {
+		rpad = []byte{}
+	} else {
+		rpad = make([]byte, maxX/2-len(right)-len(middle)/2)
+	}
 	fmt.Fprint(v, left+string(lpad)+middle+string(rpad)+right)
 	findAsYouType(shellSessionID, db, queries)
 	return nil
