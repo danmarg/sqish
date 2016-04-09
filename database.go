@@ -40,6 +40,7 @@ type query struct {
 	ShellSessionID *string
 	SortByFreq     bool
 	Limit          int
+	Offset         int
 }
 
 // database holds a database connection and provides insert and retrieval.
@@ -104,9 +105,9 @@ func (d *sqlDatabase) Query(q query) ([]record, error) {
 	}
 	var db *gorm.DB
 	if q.SortByFreq {
-		db = d.db.Table("records").Select(sqlSelectByFreq).Where(strings.Join(ws, " and "), ps...).Group(sqlGroupByFreq).Order("c desc")
+		db = d.db.Table("records").Select(sqlSelectByFreq).Where(strings.Join(ws, " and "), ps...).Group(sqlGroupByFreq).Order("c desc").Limit(q.Limit).Offset(q.Offset)
 	} else {
-		db = d.db.Table("records").Select(sqlSelectByDate).Where(strings.Join(ws, " and "), ps...).Order("time desc")
+		db = d.db.Table("records").Select(sqlSelectByDate).Where(strings.Join(ws, " and "), ps...).Order("time desc").Limit(q.Limit).Offset(q.Offset)
 	}
 	err := db.Scan(&rs).Error
 	return rs, err

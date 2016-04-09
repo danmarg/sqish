@@ -63,7 +63,7 @@ func main() {
 		{
 			Name:    "search",
 			Aliases: []string{"s"},
-			Usage:   "Search backwards",
+			Usage:   "Search (full screen)",
 			Flags: []cli.Flag{
 				cli.StringFlag{
 					Name:  "query",
@@ -80,7 +80,29 @@ func main() {
 						defer db.Close()
 						return runGui(db, ctx.GlobalString("shell_session_id"), ctx.String("query"))
 					})
-
+			},
+		},
+		{
+			Name:    "inline",
+			Aliases: []string{"i"},
+			Usage:   "Inline search",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "query",
+					Usage: "Query to pre-fill search bar with.",
+				},
+			},
+			Action: func(ctx *cli.Context) {
+				runWithErr(
+					func() error {
+						db, err := newDatabase(ctx.GlobalString("database"))
+						if err != nil {
+							return err
+						}
+						defer db.Close()
+						// Find-as-you-type on input.
+						return cliFindAsYouType(db)
+					})
 			},
 		},
 	}
