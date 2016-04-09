@@ -1,5 +1,5 @@
-# SQISH
-_SQl Interactive Shell History_
+# SqISH
+_Sql Interactive Shell History_
 
 Why store your shell history in easy-to-use plain text files when you can store
 it in a structured database instead?

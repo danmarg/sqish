@@ -11,8 +11,8 @@ import (
 
 func main() {
 	app := cli.NewApp()
-	app.Name = "SQISH"
-	app.Usage = "SQL Interactive Shell History"
+	app.Name = "SqISH"
+	app.Usage = "Sql Interactive Shell History"
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name:  "database, d",
