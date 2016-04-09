@@ -185,10 +185,6 @@ func layout(g *gocui.Gui) error {
 		}
 		v.Frame = false
 		drawSettings(v)
-		left := "[^S]ort by [*] time [ ] freq"
-		right := "[^L]imit to my session [ ]"
-		middle := make([]byte, maxX-len(left)-len(right))
-		fmt.Fprint(v, left+string(middle)+right)
 	}
 
 	return g.SetCurrentView(searchBar)
