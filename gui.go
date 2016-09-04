@@ -37,18 +37,30 @@ var (
 		gocui.KeyCtrlD: quit,
 		gocui.KeyCtrlS: func(g *gocui.Gui, v *gocui.View) error {
 			set.SortByFreq = !set.SortByFreq
+			v, err := g.View(toolBar)
+			if err != nil {
+				return err
+			}
 			return drawSettings(v)
 		},
 		gocui.KeyCtrlL: func(g *gocui.Gui, v *gocui.View) error {
 			set.OnlyMySession = !set.OnlyMySession
+			v, err := g.View(toolBar)
+			if err != nil {
+				return err
+			}
 			return drawSettings(v)
 		},
 		gocui.KeyCtrlW: func(g *gocui.Gui, v *gocui.View) error {
 			set.OnlyMyCwd = !set.OnlyMyCwd
+			v, err := g.View(toolBar)
+			if err != nil {
+				return err
+			}
 			return drawSettings(v)
 		},
-		gocui.KeyArrowUp:   func(g *gocui.Gui, v *gocui.View) error { return moveResultLine(true) },
-		gocui.KeyArrowDown: func(g *gocui.Gui, v *gocui.View) error { return moveResultLine(false) },
+		gocui.KeyArrowUp:   func(g *gocui.Gui, v *gocui.View) error { moveResultLine(true); return nil },
+		gocui.KeyArrowDown: func(g *gocui.Gui, v *gocui.View) error { moveResultLine(false); return nil },
 		gocui.KeyEnter: func(g *gocui.Gui, v *gocui.View) error {
 			v, err := g.View(resultsWindow)
 			if err != nil {
@@ -111,6 +123,19 @@ func runGui(d database, shellID, initialQuery string) error {
 	// Async function to execute queries.
 	go func() {
 		for q := range queries {
+			// Try a non-blocking read on the channel to get to the most recent query.
+			for {
+				empty := false
+				select {
+				case q = <-queries:
+					empty = false
+				default:
+					empty = true
+				}
+				if empty {
+					break
+				}
+			}
 			rs, err := db.Query(q)
 			if err != nil {
 				panic(err)
@@ -121,9 +146,7 @@ func runGui(d database, shellID, initialQuery string) error {
 	// Async function to draw results.
 	go func() {
 		for rs := range results {
-			if err := drawResults(rs); err != nil {
-				panic(err)
-			}
+			drawResults(rs)
 		}
 	}()
 	// Start GUI loop.
@@ -229,26 +252,24 @@ func guiFindAsYouType(shellSessionID string, db database, qs chan<- query) error
 	return nil
 }
 
-func moveResultLine(up bool) error {
-	v, err := gui.View(resultsWindow)
-	if err != nil {
-		return err
-	}
-	if up && resultsOffset > 0 {
-		v.MoveCursor(0, -1, false)
-		resultsOffset--
-	} else if !up && resultsOffset < len(currentResults)-1 {
-		v.MoveCursor(0, 1, false)
-		resultsOffset++
-	}
-	return nil
+func moveResultLine(up bool) {
+	gui.Execute(func(g *gocui.Gui) error {
+		v, err := g.View(resultsWindow)
+		if err != nil {
+			return err
+		}
+		if up && resultsOffset > 0 {
+			v.MoveCursor(0, -1, false)
+			resultsOffset--
+		} else if !up && resultsOffset < len(currentResults)-1 {
+			v.MoveCursor(0, 1, false)
+			resultsOffset++
+		}
+		return nil
+	})
 }
 
 func drawSettings(v *gocui.View) error {
-	v, err := gui.View(toolBar)
-	if err != nil {
-		return err
-	}
 	v.Clear()
 	maxX, _ := gui.Size()
 	var a, b, s, c, d rune
@@ -301,17 +322,19 @@ func drawSettings(v *gocui.View) error {
 	return nil
 }
 
-func drawResults(rs []record) error {
-	v, err := gui.View(resultsWindow)
-	if err != nil {
-		return err
-	}
-	v.Clear()
-	v.SetCursor(0, 0)
-	resultsOffset = 0
-	currentResults = rs
-	for _, r := range rs {
-		fmt.Fprintf(v, "%s\t\t|\t\t%s\n", r.Time.Format("2006/01/02 15:04:05"), strings.Replace(r.Cmd, "\n", " ", -1))
-	}
-	return nil
+func drawResults(rs []record) {
+	gui.Execute(func(g *gocui.Gui) error {
+		v, err := g.View(resultsWindow)
+		if err != nil {
+			return err
+		}
+		v.Clear()
+		v.SetCursor(0, 0)
+		resultsOffset = 0
+		currentResults = rs
+		for _, r := range rs {
+			fmt.Fprintf(v, "%s\t\t|\t\t%s\n", r.Time.Format("2006/01/02 15:04:05"), strings.Replace(r.Cmd, "\n", " ", -1))
+		}
+		return nil
+	})
 }
