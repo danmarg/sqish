@@ -32,7 +32,7 @@ var (
 	// Currently-displayed results.
 	currentResults []record
 	// Key binding map.
-	keybindings = map[gocui.Key]gocui.KeybindingHandler{
+	keybindings = map[gocui.Key]func(*gocui.Gui, *gocui.View) error{
 		gocui.KeyCtrlC: quit,
 		gocui.KeyCtrlD: quit,
 		gocui.KeyCtrlS: func(g *gocui.Gui, v *gocui.View) error {
@@ -76,19 +76,32 @@ var (
 
 func runGui(d database, shellID, initialQuery string) error {
 	var err error
-	gui = gocui.NewGui()
+	gui, err = gocui.NewGui(gocui.OutputNormal)
+	if err != nil {
+		return err
+	}
 	db = d
 	set, err = db.Setting()
 	if err != nil {
 		return err
 	}
 	shellSessionID = shellID
-	if err := gui.Init(); err != nil {
-		return err
-	}
 	defer gui.Close()
-	gui.SetLayout(func(g *gocui.Gui) error {
-		if err := layout(g); err != nil {
+	// Set up the find-as-you-type stuff.
+	// Channels for sending queries and getting responses.
+	queries = make(chan query, bufSize)
+	results = make(chan []record, bufSize)
+	// And an Editor function to get unbound keyboard input and pipe it to the queries channel.
+	editor := gocui.EditorFunc(func(v *gocui.View, k gocui.Key, c rune, m gocui.Modifier) {
+		if _, ok := keybindings[k]; ok {
+			return
+		}
+		gocui.DefaultEditor.Edit(v, k, c, m)
+		guiFindAsYouType(shellSessionID, db, queries)
+	})
+	// Set up the UI.
+	gui.Update(func(g *gocui.Gui) error {
+		if err := layout(g, editor); err != nil {
 			return err
 		}
 		// Prefill the search bar. This is ugly, I admit.
@@ -109,17 +122,6 @@ func runGui(d database, shellID, initialQuery string) error {
 	if err := setKeybindings(); err != nil {
 		return err
 	}
-	// Channels for sending queries and getting responses.
-	queries = make(chan query, bufSize)
-	results = make(chan []record, bufSize)
-	// Set the editor to do find-as-you-type.
-	gui.Editor = gocui.EditorFunc(func(v *gocui.View, k gocui.Key, c rune, m gocui.Modifier) {
-		if _, ok := keybindings[k]; ok {
-			return
-		}
-		gocui.DefaultEditor.Edit(v, k, c, m)
-		guiFindAsYouType(shellSessionID, db, queries)
-	})
 	// Async function to execute queries.
 	go func() {
 		for q := range queries {
@@ -164,7 +166,7 @@ func quit(_ *gocui.Gui, _ *gocui.View) error {
 	return gocui.ErrQuit
 }
 
-func layout(g *gocui.Gui) error {
+func layout(g *gocui.Gui, editor gocui.Editor) error {
 	maxX, maxY := g.Size()
 	/*
 		Layout looks something like this:
@@ -201,6 +203,8 @@ func layout(g *gocui.Gui) error {
 		v.Editable = true
 		v.Wrap = true
 		v.Frame = false
+		// Set editor.
+		v.Editor = editor
 	}
 	// toolBar
 	if v, err := g.SetView(toolBar, -1, maxY-2, maxX, maxY); err != nil {
@@ -211,7 +215,8 @@ func layout(g *gocui.Gui) error {
 		drawSettings(v)
 	}
 
-	return g.SetCurrentView(searchBar)
+	_, err := g.SetCurrentView(searchBar)
+	return err
 }
 
 func setKeybindings() error {
@@ -240,6 +245,7 @@ func guiFindAsYouType(shellSessionID string, db database, qs chan<- query) error
 	q := query{
 		Cmd:        &s,
 		SortByFreq: set.SortByFreq,
+		Limit:      bufSize,
 	}
 	if set.OnlyMySession {
 		q.Hostname = &h
@@ -253,7 +259,7 @@ func guiFindAsYouType(shellSessionID string, db database, qs chan<- query) error
 }
 
 func moveResultLine(up bool) {
-	gui.Execute(func(g *gocui.Gui) error {
+	gui.Update(func(g *gocui.Gui) error {
 		v, err := g.View(resultsWindow)
 		if err != nil {
 			return err
@@ -323,7 +329,7 @@ func drawSettings(v *gocui.View) error {
 }
 
 func drawResults(rs []record) {
-	gui.Execute(func(g *gocui.Gui) error {
+	gui.Update(func(g *gocui.Gui) error {
 		v, err := g.View(resultsWindow)
 		if err != nil {
 			return err
